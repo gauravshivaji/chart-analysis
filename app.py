@@ -6,10 +6,12 @@ st.title("📊 Probability Based Stock Prediction Evaluation")
 
 uploaded_file = st.file_uploader("Upload Dataset", type=["xlsx","csv"])
 
-if uploaded_file:
+if uploaded_file is not None:
 
-
+```
+# -----------------------------
 # Load dataset
+# -----------------------------
 if uploaded_file.name.endswith(".xlsx"):
     df = pd.read_excel(uploaded_file)
 else:
@@ -24,22 +26,26 @@ st.write(df.columns)
 st.subheader("Dataset Preview")
 st.dataframe(df.head())
 
-# ---- User selects columns manually ----
+# -----------------------------
+# Select columns
+# -----------------------------
 start_col = st.selectbox("Select START PRICE column", df.columns)
 end_col = st.selectbox("Select END PRICE column", df.columns)
 prob_col = st.selectbox("Select PROBABILITY column", df.columns)
 
-# Convert to numeric
+# Convert numeric
 df[start_col] = pd.to_numeric(df[start_col], errors="coerce")
 df[end_col] = pd.to_numeric(df[end_col], errors="coerce")
 df[prob_col] = pd.to_numeric(df[prob_col], errors="coerce")
 
 df = df.dropna(subset=[start_col, end_col, prob_col])
 
-# Remove invalid rows
+# Remove invalid prices
 df = df[df[start_col] > 0]
 
+# -----------------------------
 # Calculate return
+# -----------------------------
 df["return_%"] = ((df[end_col] - df[start_col]) / df[start_col]) * 100
 
 # Remove extreme outliers
@@ -48,7 +54,9 @@ df = df[df["return_%"].abs() < 200]
 st.subheader("Clean Data Preview")
 st.dataframe(df.head())
 
+# -----------------------------
 # Probability buckets
+# -----------------------------
 bins = [0,0.2,0.4,0.6,0.8,1]
 labels = ["0-20","20-40","40-60","60-80","80-100"]
 
@@ -84,10 +92,9 @@ result_df = pd.DataFrame(results)
 st.subheader("📊 Investment Performance by Probability Bucket")
 st.dataframe(result_df)
 
-# ---------------------------------------
-# Top Probability Portfolio Simulation
-# ---------------------------------------
-
+# -----------------------------
+# Top Probability Portfolio
+# -----------------------------
 st.subheader("🚀 Top Probability Portfolio Simulation")
 
 top_n = st.slider(
@@ -97,7 +104,6 @@ top_n = st.slider(
     value=10
 )
 
-# Sort stocks by probability
 top_stocks = df.sort_values(prob_col, ascending=False).head(top_n).copy()
 
 money_per_stock = investment / top_n
@@ -119,16 +125,18 @@ col1.metric("Initial Investment", f"₹{portfolio_initial:,.2f}")
 col2.metric("Final Portfolio Value", f"₹{portfolio_final:,.2f}")
 col3.metric("Return %", f"{portfolio_return:.2f}%")
 
-# Chart 1
+# -----------------------------
+# Charts
+# -----------------------------
 fig1 = px.bar(
     result_df,
     x="Probability Range",
     y="Return %",
     title="Return by Probability Bucket"
 )
+
 st.plotly_chart(fig1)
 
-# Chart 2
 avg_returns = df.groupby("prob_bucket")["return_%"].mean().reset_index()
 
 fig2 = px.line(
@@ -138,8 +146,10 @@ fig2 = px.line(
     markers=True,
     title="Average Stock Return vs Probability"
 )
+
 st.plotly_chart(fig2)
 
-# Debug extreme values
+# Debug extreme returns
 st.subheader("Top 10 Highest Returns (Debug)")
 st.dataframe(df.sort_values("return_%", ascending=False).head(10))
+```
