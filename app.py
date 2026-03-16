@@ -8,21 +8,50 @@ uploaded_file = st.file_uploader("Upload Dataset", type=["xlsx","csv"])
 
 if uploaded_file:
 
+    # Load dataset
     if uploaded_file.name.endswith(".xlsx"):
         df = pd.read_excel(uploaded_file)
     else:
         df = pd.read_csv(uploaded_file)
 
     # Clean column names
-    df.columns = df.columns.str.strip()
+    df.columns = df.columns.astype(str).str.strip()
+
+    # Remove duplicate column names
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    # Rename important columns safely
+    column_map = {}
+
+    for col in df.columns:
+        c = col.lower()
+
+        if "start" in c:
+            column_map[col] = "start_price"
+        elif "end" in c:
+            column_map[col] = "end_price"
+        elif "pb" in c:
+            column_map[col] = "pb"
+        elif "name" in c:
+            column_map[col] = "stock"
+
+    df = df.rename(columns=column_map)
+
+    # Ensure required columns exist
+    required = ["start_price","end_price","pb"]
+
+    for r in required:
+        if r not in df.columns:
+            st.error(f"Column {r} not found in dataset")
+            st.stop()
 
     st.subheader("Dataset Preview")
     st.dataframe(df.head())
 
-    # Calculate return
-    df["return_%"] = ((df["end_date"] - df["start_date"]) / df["start_date"]) * 100
+    # Calculate returns
+    df["return_%"] = ((df["end_price"] - df["start_price"]) / df["start_price"]) * 100
 
-    # Probability buckets (since pb is 0-1)
+    # Probability buckets
     bins = [0,0.2,0.4,0.6,0.8,1.0]
     labels = ["0-20","20-40","40-60","60-80","80-100"]
 
@@ -41,7 +70,7 @@ if uploaded_file:
 
         money_per_stock = investment / len(group)
 
-        final_value = money_per_stock * (group["end_date"] / group["start_date"])
+        final_value = money_per_stock * (group["end_price"] / group["start_price"])
 
         total_initial = money_per_stock * len(group)
         total_final = final_value.sum()
@@ -56,7 +85,7 @@ if uploaded_file:
 
     result_df = pd.DataFrame(results)
 
-    st.subheader("📊 Investment Performance")
+    st.subheader("📊 Investment Performance by Probability")
 
     st.dataframe(result_df)
 
@@ -81,7 +110,7 @@ if uploaded_file:
 
     st.plotly_chart(fig2)
 
-    # Average stock return
+    # Average return
     avg_returns = df.groupby("prob_bucket")["return_%"].mean().reset_index()
 
     fig3 = px.line(
@@ -94,4 +123,4 @@ if uploaded_file:
 
     st.plotly_chart(fig3)
 
-    st.success("Analysis Completed ✅")
+    st.success("Analysis Completed Successfully ✅")
