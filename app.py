@@ -8,67 +8,50 @@ uploaded_file = st.file_uploader("Upload Dataset", type=["xlsx","csv"])
 
 if uploaded_file:
 
-    # -----------------------------
     # Load dataset
-    # -----------------------------
     if uploaded_file.name.endswith(".xlsx"):
         df = pd.read_excel(uploaded_file)
     else:
         df = pd.read_csv(uploaded_file)
 
     # Clean column names
-    df.columns = df.columns.str.strip()
+    df.columns = df.columns.astype(str).str.strip()
 
-    st.subheader("Original Columns")
+    st.subheader("Dataset Columns")
     st.write(df.columns)
 
-    # -----------------------------
-    # Select correct columns
-    # -----------------------------
-    price_cols = [c for c in df.columns if "2026" in c or "2025" in c]
-
-    if len(price_cols) < 2:
-        st.error("Price columns not detected correctly")
-        st.stop()
-
-    start_col = price_cols[0]
-    end_col = price_cols[-1]
-
-    df = df.rename(columns={
-        start_col:"start_price",
-        end_col:"end_price"
-    })
-
-    # -----------------------------
-    # Clean numeric values
-    # -----------------------------
-    df["start_price"] = pd.to_numeric(df["start_price"], errors="coerce")
-    df["end_price"] = pd.to_numeric(df["end_price"], errors="coerce")
-    df["pb"] = pd.to_numeric(df["pb"], errors="coerce")
-
-    df = df.dropna(subset=["start_price","end_price","pb"])
-
-    # remove invalid rows
-    df = df[df["start_price"] > 0]
-
-    # -----------------------------
-    # Calculate returns
-    # -----------------------------
-    df["return_%"] = ((df["end_price"] - df["start_price"]) / df["start_price"]) * 100
-
-    # Remove unrealistic extreme values
-    df = df[df["return_%"].abs() < 200]
-
-    st.subheader("Clean Dataset")
+    st.subheader("Dataset Preview")
     st.dataframe(df.head())
 
-    # -----------------------------
+    # ---- User selects columns manually ----
+    start_col = st.selectbox("Select START PRICE column", df.columns)
+    end_col = st.selectbox("Select END PRICE column", df.columns)
+    prob_col = st.selectbox("Select PROBABILITY column", df.columns)
+
+    # Convert to numeric
+    df[start_col] = pd.to_numeric(df[start_col], errors="coerce")
+    df[end_col] = pd.to_numeric(df[end_col], errors="coerce")
+    df[prob_col] = pd.to_numeric(df[prob_col], errors="coerce")
+
+    df = df.dropna(subset=[start_col, end_col, prob_col])
+
+    # Remove invalid rows
+    df = df[df[start_col] > 0]
+
+    # Calculate return
+    df["return_%"] = ((df[end_col] - df[start_col]) / df[start_col]) * 100
+
+    # Remove extreme outliers
+    df = df[df["return_%"].abs() < 200]
+
+    st.subheader("Clean Data Preview")
+    st.dataframe(df.head())
+
     # Probability buckets
-    # -----------------------------
     bins = [0,0.2,0.4,0.6,0.8,1]
     labels = ["0-20","20-40","40-60","60-80","80-100"]
 
-    df["prob_bucket"] = pd.cut(df["pb"], bins=bins, labels=labels)
+    df["prob_bucket"] = pd.cut(df[prob_col], bins=bins, labels=labels)
 
     investment = st.number_input("Total Investment", value=100000)
 
@@ -83,9 +66,9 @@ if uploaded_file:
 
         weight = investment / len(group)
 
-        portfolio = weight * (group["end_price"] / group["start_price"])
+        portfolio_value = weight * (group[end_col] / group[start_col])
 
-        total_final = portfolio.sum()
+        total_final = portfolio_value.sum()
 
         results.append({
             "Probability Range": bucket,
@@ -97,34 +80,30 @@ if uploaded_file:
 
     result_df = pd.DataFrame(results)
 
-    st.subheader("📊 Investment Performance by Probability")
+    st.subheader("📊 Investment Performance by Probability Bucket")
     st.dataframe(result_df)
 
-    # -----------------------------
-    # Charts
-    # -----------------------------
-    fig = px.bar(
+    # Chart 1
+    fig1 = px.bar(
         result_df,
         x="Probability Range",
         y="Return %",
         title="Return by Probability Bucket"
     )
-    st.plotly_chart(fig)
+    st.plotly_chart(fig1)
 
-    avg = df.groupby("prob_bucket")["return_%"].mean().reset_index()
+    # Chart 2
+    avg_returns = df.groupby("prob_bucket")["return_%"].mean().reset_index()
 
     fig2 = px.line(
-        avg,
+        avg_returns,
         x="prob_bucket",
         y="return_%",
         markers=True,
         title="Average Stock Return vs Probability"
     )
-
     st.plotly_chart(fig2)
 
-    # -----------------------------
-    # Debug extreme returns
-    # -----------------------------
+    # Debug extreme values
     st.subheader("Top 10 Highest Returns (Debug)")
-    st.dataframe(df.sort_values("return_%",ascending=False).head(10))
+    st.dataframe(df.sort_values("return_%", ascending=False).head(10))
