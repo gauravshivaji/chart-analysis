@@ -156,100 +156,67 @@ if uploaded_file:
 
     st.pyplot(fig4)
 
-    # -------------------
-    # Probability vs Return
-    # -------------------
-
-    st.subheader("Probability vs Actual Return")
-
-    bins = [0,0.2,0.4,0.6,0.8,1]
-
-    df["pb_group"] = pd.cut(df[prob_col], bins)
-
-    pb_return = df.groupby("pb_group")["return_1"].mean()
-
-    fig5, ax5 = plt.subplots()
-
-    pb_return.plot(kind="bar", ax=ax5)
-
-    ax5.set_ylabel("Average Return")
-
-    st.pyplot(fig5)
-
     # ================================
-# PB Range Investment Analysis
-# ================================
+    # PB Range Investment Analysis
+    # ================================
 
-st.header("📊 PB Range Investment Analysis")
+    st.header("📊 PB Range Investment Analysis")
 
-investment = 100000
+    investment = 100000
 
-# Create pb ranges
-bins = [0,0.2,0.4,0.6,0.8,1]
+    bins = [0, 0.2, 0.4, 0.6, 0.8, 1]
 
-labels = [
-    "0–20%",
-    "20–40%",
-    "40–60%",
-    "60–80%",
-    "80–100%"
-]
+    labels = [
+        "0–20%",
+        "20–40%",
+        "40–60%",
+        "60–80%",
+        "80–100%"
+    ]
 
-df["pb_range"] = pd.cut(df[prob_col], bins=bins, labels=labels)
+    df["pb_range"] = pd.cut(df[prob_col], bins=bins, labels=labels)
 
-# Group statistics
-pb_table = df.groupby("pb_range").agg(
-    stocks=("pb_range","count"),
-    avg_return_feb=("return_2","mean"),
-    avg_return_mar=("return_1","mean")
-).reset_index()
+    pb_table = df.groupby("pb_range").agg(
+        stocks=("pb_range", "count"),
+        avg_return_feb=("return_2", "mean"),
+        avg_return_mar=("return_1", "mean")
+    ).reset_index()
 
-# Calculate investment value
-pb_table["value_feb"] = investment * (1 + pb_table["avg_return_feb"])
-pb_table["value_mar"] = investment * (1 + pb_table["avg_return_mar"])
+    pb_table["value_feb"] = investment * (1 + pb_table["avg_return_feb"])
+    pb_table["value_mar"] = investment * (1 + pb_table["avg_return_mar"])
 
-# Convert to %
-pb_table["avg_return_feb"] = pb_table["avg_return_feb"] * 100
-pb_table["avg_return_mar"] = pb_table["avg_return_mar"] * 100
+    pb_table["avg_return_feb"] = pb_table["avg_return_feb"] * 100
+    pb_table["avg_return_mar"] = pb_table["avg_return_mar"] * 100
 
-# Round values
-pb_table = pb_table.round(2)
+    pb_table = pb_table.round(2)
 
-st.dataframe(pb_table)
+    st.dataframe(pb_table)
 
-     
+    # -------------------
+    # Return by Probability Range Chart
+    # -------------------
+
+    st.subheader("Return by Probability Range")
+
+    fig, ax = plt.subplots()
+
+    ax.bar(pb_table["pb_range"], pb_table["avg_return_mar"])
+
+    ax.set_xlabel("PB Range")
+    ax.set_ylabel("Average Return %")
+    ax.set_title("Return vs Model Probability")
+
+    st.pyplot(fig)
 
     # -------------------
     # Top Confidence Predictions
     # -------------------
-    st.subheader("Return by Probability Range")
 
-fig, ax = plt.subplots()
-
-ax.bar(pb_table["pb_range"], pb_table["avg_return_mar"])
-
-ax.set_xlabel("PB Range")
-ax.set_ylabel("Average Return %")
-ax.set_title("Return vs Model Probability")
-
-st.pyplot(fig)
     st.subheader("Top Confidence Predictions")
 
     top_pb = df.sort_values(prob_col, ascending=False).head(10)
 
     st.dataframe(top_pb[[name_col, prob_col, "return_1"]])
-
-    # -------------------
-    # Strategy Simulation
-    # -------------------
-
- 
-
-    # -------------------
-    # Model Edge
-    # -------------------
-    
-
 
     # -------------------
     # Detailed Results
