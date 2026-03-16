@@ -208,34 +208,13 @@ if uploaded_file:
     # Strategy Simulation
     # -------------------
 
-    st.subheader("Trading Strategy Simulation")
-
-    threshold = st.slider("Buy if pb >", 0.5, 0.9, 0.6)
-
-    strategy = df[df[prob_col] > threshold]
-
-    avg_return = strategy["return_1"].mean()
-
-    st.metric("Strategy Average Return", f"{avg_return*100:.2f}%")
-
-    st.write("Stocks selected:", len(strategy))
+ 
 
     # -------------------
     # Model Edge
     # -------------------
 
-    st.subheader("Model Edge Analysis")
 
-    high = df[df[prob_col] > 0.7]["return_1"].mean()
-    low = df[df[prob_col] < 0.3]["return_1"].mean()
-
-    col3, col4 = st.columns(2)
-
-    with col3:
-        st.metric("High Probability Return", f"{high*100:.2f}%")
-
-    with col4:
-        st.metric("Low Probability Return", f"{low*100:.2f}%")
 
     # -------------------
     # Detailed Results
