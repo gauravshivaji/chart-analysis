@@ -15,26 +15,36 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
     # Clean column names
-    df.columns = df.columns.str.strip()
+    df.columns = [str(c).strip() for c in df.columns]
 
     st.subheader("Dataset Preview")
     st.dataframe(df.head())
 
-    st.subheader("Select Columns")
+    # Detect date columns automatically
+    date_cols = [c for c in df.columns if "2026" in str(c)]
 
-    columns = df.columns.tolist()
+    if len(date_cols) < 3:
+        st.error("Date columns not detected correctly.")
+        st.stop()
 
-    start_price = st.selectbox("Select Start Date Price Column", columns)
-    end_price1 = st.selectbox("Select End Date Column (Comparison 1)", columns)
-    end_price2 = st.selectbox("Select End Date Column (Comparison 2)", columns)
-    prob_col = st.selectbox("Select Probability Column", columns)
-    name_col = st.selectbox("Select Stock Name Column", columns)
+    start_price = date_cols[0]
+    end_price1 = date_cols[1]
+    end_price2 = date_cols[2]
 
-    # Clean probability column
+    name_col = "name"
+    prob_col = "pb"
+
+    st.write("### Detected Columns")
+
+    st.write("Start Price:", start_price)
+    st.write("Comparison 1:", end_price1)
+    st.write("Comparison 2:", end_price2)
+
+    # Clean probability
     df[prob_col] = (
         df[prob_col]
         .astype(str)
-        .str.replace("%", "", regex=False)
+        .str.replace("%","",regex=False)
         .astype(float)
     )
 
@@ -44,34 +54,50 @@ if uploaded_file:
     # Prediction
     df["prediction"] = (df[prob_col] > 0.5).astype(int)
 
+    # -------------------
     # Period 1
+    # -------------------
+
     df["return_1"] = (df[end_price1] - df[start_price]) / df[start_price]
+
     df["actual_1"] = (df["return_1"] > 0).astype(int)
 
     acc1 = accuracy_score(df["actual_1"], df["prediction"])
 
+    # -------------------
     # Period 2
+    # -------------------
+
     df["return_2"] = (df[end_price2] - df[start_price]) / df[start_price]
+
     df["actual_2"] = (df["return_2"] > 0).astype(int)
 
     acc2 = accuracy_score(df["actual_2"], df["prediction"])
+
+    # -------------------
+    # Accuracy Metrics
+    # -------------------
 
     st.subheader("Model Accuracy")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.metric("Accuracy Comparison 1", f"{acc1*100:.2f}%")
+        st.metric("Accuracy (Jan → Mar)", f"{acc1*100:.2f}%")
 
     with col2:
-        st.metric("Accuracy Comparison 2", f"{acc2*100:.2f}%")
+        st.metric("Accuracy (Jan → Feb)", f"{acc2*100:.2f}%")
 
+    # -------------------
     # Confusion Matrix 1
-    st.subheader("Confusion Matrix (Comparison 1)")
+    # -------------------
+
+    st.subheader("Confusion Matrix (Jan → Mar)")
 
     cm1 = confusion_matrix(df["actual_1"], df["prediction"])
 
     fig1, ax1 = plt.subplots()
+
     sns.heatmap(cm1, annot=True, fmt="d", cmap="Blues", ax=ax1)
 
     ax1.set_xlabel("Predicted")
@@ -79,12 +105,16 @@ if uploaded_file:
 
     st.pyplot(fig1)
 
+    # -------------------
     # Confusion Matrix 2
-    st.subheader("Confusion Matrix (Comparison 2)")
+    # -------------------
+
+    st.subheader("Confusion Matrix (Jan → Feb)")
 
     cm2 = confusion_matrix(df["actual_2"], df["prediction"])
 
     fig2, ax2 = plt.subplots()
+
     sns.heatmap(cm2, annot=True, fmt="d", cmap="Greens", ax=ax2)
 
     ax2.set_xlabel("Predicted")
@@ -92,43 +122,48 @@ if uploaded_file:
 
     st.pyplot(fig2)
 
-    # Accuracy comparison chart
-    st.subheader("Accuracy Comparison Chart")
+    # -------------------
+    # Accuracy Chart
+    # -------------------
+
+    st.subheader("Accuracy Comparison")
 
     fig3, ax3 = plt.subplots()
 
-    periods = ["Comparison 1", "Comparison 2"]
-    accuracy_vals = [acc1 * 100, acc2 * 100]
+    periods = ["Jan→Mar", "Jan→Feb"]
+    values = [acc1*100, acc2*100]
 
-    ax3.bar(periods, accuracy_vals)
+    ax3.bar(periods, values)
 
     ax3.set_ylabel("Accuracy %")
-    ax3.set_title("Model Performance")
 
     st.pyplot(fig3)
 
-    # Detailed results
-    st.subheader("Detailed Prediction Table")
+    # -------------------
+    # Detailed Results
+    # -------------------
 
-    df["correct_comp1"] = df["actual_1"] == df["prediction"]
-    df["correct_comp2"] = df["actual_2"] == df["prediction"]
+    st.subheader("Detailed Predictions")
+
+    df["correct_mar"] = df["actual_1"] == df["prediction"]
+    df["correct_feb"] = df["actual_2"] == df["prediction"]
 
     st.dataframe(
         df[
             [
-                name_col,
-                prob_col,
+                "name",
+                "pb",
                 start_price,
                 end_price1,
                 end_price2,
                 "prediction",
                 "actual_1",
                 "actual_2",
-                "correct_comp1",
-                "correct_comp2",
+                "correct_mar",
+                "correct_feb",
             ]
         ]
     )
 
 else:
-    st.info("Upload an Excel file to start analysis.")
+    st.info("Upload your Excel file to begin analysis.")
