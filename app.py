@@ -5,32 +5,51 @@ import plotly.express as px
 
 st.title("📊 Probability Based Stock Prediction Evaluation")
 
-uploaded_file = st.file_uploader("Upload Dataset", type=["xlsx","csv"])
+uploaded_file = st.file_uploader("Upload Dataset", type=["xlsx", "csv"])
 
 if uploaded_file:
 
-    if uploaded_file.name.endswith("xlsx"):
+    # Load file
+    if uploaded_file.name.endswith(".xlsx"):
         df = pd.read_excel(uploaded_file)
     else:
         df = pd.read_csv(uploaded_file)
 
     df.columns = df.columns.str.strip()
 
-    start_col = df.columns[1]
-    prob_col = "pb"
-    end_col = df.columns[3]
+    st.subheader("Dataset Columns")
+    st.write(df.columns)
 
+    # --- Identify important columns ---
+    price_columns = []
+
+    for col in df.columns:
+        if "2026" in str(col) or "2025" in str(col):
+            price_columns.append(col)
+
+    if len(price_columns) < 2:
+        st.error("Need two price columns (start and end date)")
+        st.stop()
+
+    start_price_col = price_columns[0]
+    end_price_col = price_columns[-1]
+
+    prob_col = "pb"
+
+    # Rename columns
     df = df.rename(columns={
-        start_col:"start_price",
-        end_col:"end_price"
+        start_price_col: "start_price",
+        end_price_col: "end_price"
     })
 
-    df["return"] = (df["end_price"] - df["start_price"]) / df["start_price"] * 100
+    # Calculate return
+    df["return_%"] = ((df["end_price"] - df["start_price"]) / df["start_price"]) * 100
 
+    # Probability buckets
     bins = [0,20,40,60,80,100]
     labels = ["0-20","20-40","40-60","60-80","80-100"]
 
-    df["prob_bucket"] = pd.cut(df["pb"], bins=bins, labels=labels)
+    df["prob_bucket"] = pd.cut(df[prob_col], bins=bins, labels=labels)
 
     st.subheader("Dataset Preview")
     st.dataframe(df.head())
@@ -48,12 +67,10 @@ if uploaded_file:
 
         money_per_stock = investment / len(group)
 
-        group["investment"] = money_per_stock
+        final_values = money_per_stock * (group["end_price"] / group["start_price"])
 
-        group["final_value"] = money_per_stock * (group["end_price"] / group["start_price"])
-
-        total_initial = group["investment"].sum()
-        total_final = group["final_value"].sum()
+        total_initial = money_per_stock * len(group)
+        total_final = final_values.sum()
 
         results.append({
             "Probability Range": bucket,
@@ -65,10 +82,10 @@ if uploaded_file:
 
     result_df = pd.DataFrame(results)
 
-    st.subheader("📊 Investment Performance by Probability")
-
+    st.subheader("📊 Investment Performance by Probability Bucket")
     st.dataframe(result_df)
 
+    # Return chart
     fig = px.bar(
         result_df,
         x="Probability Range",
@@ -78,6 +95,7 @@ if uploaded_file:
 
     st.plotly_chart(fig)
 
+    # Investment comparison
     fig2 = px.bar(
         result_df,
         x="Probability Range",
@@ -88,18 +106,17 @@ if uploaded_file:
 
     st.plotly_chart(fig2)
 
-    st.subheader("📈 Average Stock Return by Probability")
-
-    avg_returns = df.groupby("prob_bucket")["return"].mean().reset_index()
+    # Average stock return
+    avg_returns = df.groupby("prob_bucket")["return_%"].mean().reset_index()
 
     fig3 = px.line(
         avg_returns,
         x="prob_bucket",
-        y="return",
+        y="return_%",
         markers=True,
         title="Average Return vs Probability"
     )
 
     st.plotly_chart(fig3)
 
-    st.success("Analysis Completed ✅")
+    st.success("Analysis Completed Successfully ✅")
