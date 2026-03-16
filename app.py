@@ -8,7 +8,7 @@ uploaded_file = st.file_uploader("Upload Dataset", type=["xlsx","csv"])
 
 if uploaded_file is not None:
 
-```
+
 # -----------------------------
 # Load dataset
 # -----------------------------
@@ -152,4 +152,4 @@ st.plotly_chart(fig2)
 # Debug extreme returns
 st.subheader("Top 10 Highest Returns (Debug)")
 st.dataframe(df.sort_values("return_%", ascending=False).head(10))
-```
+
