@@ -20,7 +20,7 @@ if uploaded_file:
     st.subheader("Dataset Preview")
     st.dataframe(df.head())
 
-    # Detect date columns automatically
+    # Detect date columns
     date_cols = [c for c in df.columns if "2026" in str(c)]
 
     if len(date_cols) < 3:
@@ -39,7 +39,7 @@ if uploaded_file:
     st.write("Comparison 1:", end_price1)
     st.write("Comparison 2:", end_price2)
 
-    # Clean probability
+    # Clean probability column
     df[prob_col] = (
         df[prob_col]
         .astype(str)
@@ -49,6 +49,17 @@ if uploaded_file:
 
     if df[prob_col].max() > 1:
         df[prob_col] = df[prob_col] / 100
+
+    # Clean price columns
+    df[start_price] = pd.to_numeric(df[start_price], errors="coerce")
+    df[end_price1] = pd.to_numeric(df[end_price1], errors="coerce")
+    df[end_price2] = pd.to_numeric(df[end_price2], errors="coerce")
+
+    # Remove invalid rows
+    df = df.dropna(subset=[start_price, end_price1, end_price2])
+
+    # Avoid divide by zero
+    df = df[df[start_price] > 1]
 
     # Prediction
     df["prediction"] = (df[prob_col] > 0.5).astype(int)
@@ -60,8 +71,6 @@ if uploaded_file:
     df["return_1"] = (df[end_price1] - df[start_price]) / df[start_price]
     df["actual_1"] = (df["return_1"] > 0).astype(int)
 
-    acc1 = accuracy_score(df["actual_1"], df["prediction"])
-
     # -------------------
     # Period 2
     # -------------------
@@ -69,6 +78,11 @@ if uploaded_file:
     df["return_2"] = (df[end_price2] - df[start_price]) / df[start_price]
     df["actual_2"] = (df["return_2"] > 0).astype(int)
 
+    # Remove unrealistic returns
+    df = df[(df["return_1"] < 1) & (df["return_1"] > -1)]
+    df = df[(df["return_2"] < 1) & (df["return_2"] > -1)]
+
+    acc1 = accuracy_score(df["actual_1"], df["prediction"])
     acc2 = accuracy_score(df["actual_2"], df["prediction"])
 
     # -------------------
@@ -86,7 +100,7 @@ if uploaded_file:
         st.metric("Accuracy (Jan → Feb)", f"{acc2*100:.2f}%")
 
     # -------------------
-    # Confusion Matrix 1
+    # Confusion Matrix
     # -------------------
 
     st.subheader("Confusion Matrix (Jan → Mar)")
@@ -100,10 +114,6 @@ if uploaded_file:
     ax1.set_ylabel("Actual")
 
     st.pyplot(fig1)
-
-    # -------------------
-    # Confusion Matrix 2
-    # -------------------
 
     st.subheader("Confusion Matrix (Jan → Feb)")
 
@@ -129,20 +139,17 @@ if uploaded_file:
     values = [acc1*100, acc2*100]
 
     ax3.bar(periods, values)
-
     ax3.set_ylabel("Accuracy %")
 
     st.pyplot(fig3)
 
     # ==========================================================
-    # NEW MODEL INSIGHT ANALYSIS
+    # MODEL INSIGHT ANALYSIS
     # ==========================================================
 
     st.header("🔎 Model Insight Analysis")
 
-    # -------------------
-    # Probability Distribution
-    # -------------------
+    # Probability distribution
 
     st.subheader("Probability Distribution")
 
@@ -156,15 +163,15 @@ if uploaded_file:
 
     st.pyplot(fig4)
 
-    # ================================
-    # PB Range Investment Analysis
-    # ================================
+    # ==========================================================
+    # PB RANGE INVESTMENT ANALYSIS
+    # ==========================================================
 
     st.header("📊 PB Range Investment Analysis")
 
     investment = 100000
 
-    bins = [0, 0.2, 0.4, 0.6, 0.8, 1]
+    bins = [0,0.2,0.4,0.6,0.8,1]
 
     labels = [
         "0–20%",
@@ -177,39 +184,36 @@ if uploaded_file:
     df["pb_range"] = pd.cut(df[prob_col], bins=bins, labels=labels)
 
     pb_table = df.groupby("pb_range").agg(
-        stocks=("pb_range", "count"),
-        avg_return_feb=("return_2", "mean"),
-        avg_return_mar=("return_1", "mean")
+        stocks=("pb_range","count"),
+        median_return_feb=("return_2","median"),
+        median_return_mar=("return_1","median")
     ).reset_index()
 
-    pb_table["value_feb"] = investment * (1 + pb_table["avg_return_feb"])
-    pb_table["value_mar"] = investment * (1 + pb_table["avg_return_mar"])
+    pb_table["value_feb"] = investment * (1 + pb_table["median_return_feb"])
+    pb_table["value_mar"] = investment * (1 + pb_table["median_return_mar"])
 
-    pb_table["avg_return_feb"] = pb_table["avg_return_feb"] * 100
-    pb_table["avg_return_mar"] = pb_table["avg_return_mar"] * 100
+    pb_table["median_return_feb"] = pb_table["median_return_feb"] * 100
+    pb_table["median_return_mar"] = pb_table["median_return_mar"] * 100
 
     pb_table = pb_table.round(2)
 
     st.dataframe(pb_table)
 
-    # -------------------
-    # Return by Probability Range Chart
-    # -------------------
+    # Chart
 
-    st.subheader("Return by Probability Range")
+    st.subheader("Return vs Model Probability")
 
-    fig, ax = plt.subplots()
+    fig5, ax5 = plt.subplots()
 
-    ax.bar(pb_table["pb_range"], pb_table["avg_return_mar"])
+    ax5.bar(pb_table["pb_range"], pb_table["median_return_mar"])
 
-    ax.set_xlabel("PB Range")
-    ax.set_ylabel("Average Return %")
-    ax.set_title("Return vs Model Probability")
+    ax5.set_xlabel("PB Range")
+    ax5.set_ylabel("Median Return %")
 
-    st.pyplot(fig)
+    st.pyplot(fig5)
 
     # -------------------
-    # Top Confidence Predictions
+    # Top Predictions
     # -------------------
 
     st.subheader("Top Confidence Predictions")
@@ -217,6 +221,16 @@ if uploaded_file:
     top_pb = df.sort_values(prob_col, ascending=False).head(10)
 
     st.dataframe(top_pb[[name_col, prob_col, "return_1"]])
+
+    # -------------------
+    # Extreme Return Debug
+    # -------------------
+
+    st.subheader("Extreme Return Check")
+
+    extreme = df[df["return_1"] > 0.5]
+
+    st.dataframe(extreme[[name_col, start_price, end_price1, "return_1"]])
 
     # -------------------
     # Detailed Results
