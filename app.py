@@ -35,7 +35,6 @@ if uploaded_file:
     prob_col = "pb"
 
     st.write("### Detected Columns")
-
     st.write("Start Price:", start_price)
     st.write("Comparison 1:", end_price1)
     st.write("Comparison 2:", end_price2)
@@ -44,7 +43,7 @@ if uploaded_file:
     df[prob_col] = (
         df[prob_col]
         .astype(str)
-        .str.replace("%","",regex=False)
+        .str.replace("%", "", regex=False)
         .astype(float)
     )
 
@@ -59,7 +58,6 @@ if uploaded_file:
     # -------------------
 
     df["return_1"] = (df[end_price1] - df[start_price]) / df[start_price]
-
     df["actual_1"] = (df["return_1"] > 0).astype(int)
 
     acc1 = accuracy_score(df["actual_1"], df["prediction"])
@@ -69,7 +67,6 @@ if uploaded_file:
     # -------------------
 
     df["return_2"] = (df[end_price2] - df[start_price]) / df[start_price]
-
     df["actual_2"] = (df["return_2"] > 0).astype(int)
 
     acc2 = accuracy_score(df["actual_2"], df["prediction"])
@@ -97,7 +94,6 @@ if uploaded_file:
     cm1 = confusion_matrix(df["actual_1"], df["prediction"])
 
     fig1, ax1 = plt.subplots()
-
     sns.heatmap(cm1, annot=True, fmt="d", cmap="Blues", ax=ax1)
 
     ax1.set_xlabel("Predicted")
@@ -114,7 +110,6 @@ if uploaded_file:
     cm2 = confusion_matrix(df["actual_2"], df["prediction"])
 
     fig2, ax2 = plt.subplots()
-
     sns.heatmap(cm2, annot=True, fmt="d", cmap="Greens", ax=ax2)
 
     ax2.set_xlabel("Predicted")
@@ -139,6 +134,109 @@ if uploaded_file:
 
     st.pyplot(fig3)
 
+    # ==========================================================
+    # NEW MODEL INSIGHT ANALYSIS
+    # ==========================================================
+
+    st.header("🔎 Model Insight Analysis")
+
+    # -------------------
+    # Probability Distribution
+    # -------------------
+
+    st.subheader("Probability Distribution")
+
+    fig4, ax4 = plt.subplots()
+
+    ax4.hist(df[prob_col], bins=20)
+
+    ax4.set_title("Distribution of Model Probabilities")
+    ax4.set_xlabel("pb")
+    ax4.set_ylabel("Number of Stocks")
+
+    st.pyplot(fig4)
+
+    # -------------------
+    # Probability vs Return
+    # -------------------
+
+    st.subheader("Probability vs Actual Return")
+
+    bins = [0,0.2,0.4,0.6,0.8,1]
+
+    df["pb_group"] = pd.cut(df[prob_col], bins)
+
+    pb_return = df.groupby("pb_group")["return_1"].mean()
+
+    fig5, ax5 = plt.subplots()
+
+    pb_return.plot(kind="bar", ax=ax5)
+
+    ax5.set_ylabel("Average Return")
+
+    st.pyplot(fig5)
+
+    # -------------------
+    # Calibration Curve
+    # -------------------
+
+    st.subheader("Probability Calibration Curve")
+
+    df["pb_bin"] = pd.cut(df[prob_col], bins=10)
+
+    calibration = df.groupby("pb_bin")["actual_1"].mean()
+
+    fig6, ax6 = plt.subplots()
+
+    calibration.plot(ax=ax6)
+
+    ax6.set_ylabel("Actual Success Rate")
+
+    st.pyplot(fig6)
+
+    # -------------------
+    # Top Confidence Predictions
+    # -------------------
+
+    st.subheader("Top Confidence Predictions")
+
+    top_pb = df.sort_values(prob_col, ascending=False).head(10)
+
+    st.dataframe(top_pb[[name_col, prob_col, "return_1"]])
+
+    # -------------------
+    # Strategy Simulation
+    # -------------------
+
+    st.subheader("Trading Strategy Simulation")
+
+    threshold = st.slider("Buy if pb >", 0.5, 0.9, 0.6)
+
+    strategy = df[df[prob_col] > threshold]
+
+    avg_return = strategy["return_1"].mean()
+
+    st.metric("Strategy Average Return", f"{avg_return*100:.2f}%")
+
+    st.write("Stocks selected:", len(strategy))
+
+    # -------------------
+    # Model Edge
+    # -------------------
+
+    st.subheader("Model Edge Analysis")
+
+    high = df[df[prob_col] > 0.7]["return_1"].mean()
+    low = df[df[prob_col] < 0.3]["return_1"].mean()
+
+    col3, col4 = st.columns(2)
+
+    with col3:
+        st.metric("High Probability Return", f"{high*100:.2f}%")
+
+    with col4:
+        st.metric("Low Probability Return", f"{low*100:.2f}%")
+
     # -------------------
     # Detailed Results
     # -------------------
@@ -151,8 +249,8 @@ if uploaded_file:
     st.dataframe(
         df[
             [
-                "name",
-                "pb",
+                name_col,
+                prob_col,
                 start_price,
                 end_price1,
                 end_price2,
