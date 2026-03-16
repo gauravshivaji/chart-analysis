@@ -176,28 +176,63 @@ if uploaded_file:
 
     st.pyplot(fig5)
 
-    # -------------------
-    # Calibration Curve
-    # -------------------
+    # ================================
+# PB Range Investment Analysis
+# ================================
 
-    st.subheader("Probability Calibration Curve")
+st.header("📊 PB Range Investment Analysis")
 
-    df["pb_bin"] = pd.cut(df[prob_col], bins=10)
+investment = 100000
 
-    calibration = df.groupby("pb_bin")["actual_1"].mean()
+# Create pb ranges
+bins = [0,0.2,0.4,0.6,0.8,1]
 
-    fig6, ax6 = plt.subplots()
+labels = [
+    "0–20%",
+    "20–40%",
+    "40–60%",
+    "60–80%",
+    "80–100%"
+]
 
-    calibration.plot(ax=ax6)
+df["pb_range"] = pd.cut(df[prob_col], bins=bins, labels=labels)
 
-    ax6.set_ylabel("Actual Success Rate")
+# Group statistics
+pb_table = df.groupby("pb_range").agg(
+    stocks=("pb_range","count"),
+    avg_return_feb=("return_2","mean"),
+    avg_return_mar=("return_1","mean")
+).reset_index()
 
-    st.pyplot(fig6)
+# Calculate investment value
+pb_table["value_feb"] = investment * (1 + pb_table["avg_return_feb"])
+pb_table["value_mar"] = investment * (1 + pb_table["avg_return_mar"])
+
+# Convert to %
+pb_table["avg_return_feb"] = pb_table["avg_return_feb"] * 100
+pb_table["avg_return_mar"] = pb_table["avg_return_mar"] * 100
+
+# Round values
+pb_table = pb_table.round(2)
+
+st.dataframe(pb_table)
+
+     
 
     # -------------------
     # Top Confidence Predictions
     # -------------------
+    st.subheader("Return by Probability Range")
 
+fig, ax = plt.subplots()
+
+ax.bar(pb_table["pb_range"], pb_table["avg_return_mar"])
+
+ax.set_xlabel("PB Range")
+ax.set_ylabel("Average Return %")
+ax.set_title("Return vs Model Probability")
+
+st.pyplot(fig)
     st.subheader("Top Confidence Predictions")
 
     top_pb = df.sort_values(prob_col, ascending=False).head(10)
@@ -213,7 +248,7 @@ if uploaded_file:
     # -------------------
     # Model Edge
     # -------------------
-
+    
 
 
     # -------------------
