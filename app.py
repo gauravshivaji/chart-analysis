@@ -2,57 +2,70 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.title("📊 Stock Probability Prediction Evaluation")
+st.title("📊 Probability Based Stock Prediction Evaluation")
 
 uploaded_file = st.file_uploader("Upload Dataset", type=["xlsx","csv"])
 
 if uploaded_file:
 
+    # -----------------------------
     # Load dataset
+    # -----------------------------
     if uploaded_file.name.endswith(".xlsx"):
         df = pd.read_excel(uploaded_file)
     else:
         df = pd.read_csv(uploaded_file)
 
     # Clean column names
-    df.columns = df.columns.astype(str).str.strip()
+    df.columns = df.columns.str.strip()
 
-    # Remove duplicate column names
-    df = df.loc[:, ~df.columns.duplicated()]
+    st.subheader("Original Columns")
+    st.write(df.columns)
 
-    # Rename important columns safely
-    column_map = {}
+    # -----------------------------
+    # Select correct columns
+    # -----------------------------
+    price_cols = [c for c in df.columns if "2026" in c or "2025" in c]
 
-    for col in df.columns:
-        c = col.lower()
+    if len(price_cols) < 2:
+        st.error("Price columns not detected correctly")
+        st.stop()
 
-        if "start" in c:
-            column_map[col] = "start_price"
-        elif "end" in c:
-            column_map[col] = "end_price"
-        elif "pb" in c:
-            column_map[col] = "pb"
-        elif "name" in c:
-            column_map[col] = "stock"
+    start_col = price_cols[0]
+    end_col = price_cols[-1]
 
-    df = df.rename(columns=column_map)
+    df = df.rename(columns={
+        start_col:"start_price",
+        end_col:"end_price"
+    })
 
-    # Ensure required columns exist
-    required = ["start_price","end_price","pb"]
+    # -----------------------------
+    # Clean numeric values
+    # -----------------------------
+    df["start_price"] = pd.to_numeric(df["start_price"], errors="coerce")
+    df["end_price"] = pd.to_numeric(df["end_price"], errors="coerce")
+    df["pb"] = pd.to_numeric(df["pb"], errors="coerce")
 
-    for r in required:
-        if r not in df.columns:
-            st.error(f"Column {r} not found in dataset")
-            st.stop()
+    df = df.dropna(subset=["start_price","end_price","pb"])
 
-    st.subheader("Dataset Preview")
-    st.dataframe(df.head())
+    # remove invalid rows
+    df = df[df["start_price"] > 0]
 
+    # -----------------------------
     # Calculate returns
+    # -----------------------------
     df["return_%"] = ((df["end_price"] - df["start_price"]) / df["start_price"]) * 100
 
+    # Remove unrealistic extreme values
+    df = df[df["return_%"].abs() < 200]
+
+    st.subheader("Clean Dataset")
+    st.dataframe(df.head())
+
+    # -----------------------------
     # Probability buckets
-    bins = [0,0.2,0.4,0.6,0.8,1.0]
+    # -----------------------------
+    bins = [0,0.2,0.4,0.6,0.8,1]
     labels = ["0-20","20-40","40-60","60-80","80-100"]
 
     df["prob_bucket"] = pd.cut(df["pb"], bins=bins, labels=labels)
@@ -68,59 +81,50 @@ if uploaded_file:
         if len(group) == 0:
             continue
 
-        money_per_stock = investment / len(group)
+        weight = investment / len(group)
 
-        final_value = money_per_stock * (group["end_price"] / group["start_price"])
+        portfolio = weight * (group["end_price"] / group["start_price"])
 
-        total_initial = money_per_stock * len(group)
-        total_final = final_value.sum()
+        total_final = portfolio.sum()
 
         results.append({
             "Probability Range": bucket,
             "Stocks": len(group),
-            "Initial Investment": round(total_initial,2),
+            "Initial Investment": investment,
             "Final Value": round(total_final,2),
-            "Return %": round(((total_final-total_initial)/total_initial)*100,2)
+            "Return %": round(((total_final-investment)/investment)*100,2)
         })
 
     result_df = pd.DataFrame(results)
 
     st.subheader("📊 Investment Performance by Probability")
-
     st.dataframe(result_df)
 
-    # Return chart
-    fig1 = px.bar(
+    # -----------------------------
+    # Charts
+    # -----------------------------
+    fig = px.bar(
         result_df,
         x="Probability Range",
         y="Return %",
         title="Return by Probability Bucket"
     )
+    st.plotly_chart(fig)
 
-    st.plotly_chart(fig1)
+    avg = df.groupby("prob_bucket")["return_%"].mean().reset_index()
 
-    # Investment comparison
-    fig2 = px.bar(
-        result_df,
-        x="Probability Range",
-        y=["Initial Investment","Final Value"],
-        barmode="group",
-        title="Initial vs Final Investment"
+    fig2 = px.line(
+        avg,
+        x="prob_bucket",
+        y="return_%",
+        markers=True,
+        title="Average Stock Return vs Probability"
     )
 
     st.plotly_chart(fig2)
 
-    # Average return
-    avg_returns = df.groupby("prob_bucket")["return_%"].mean().reset_index()
-
-    fig3 = px.line(
-        avg_returns,
-        x="prob_bucket",
-        y="return_%",
-        markers=True,
-        title="Average Return vs Probability"
-    )
-
-    st.plotly_chart(fig3)
-
-    st.success("Analysis Completed Successfully ✅")
+    # -----------------------------
+    # Debug extreme returns
+    # -----------------------------
+    st.subheader("Top 10 Highest Returns (Debug)")
+    st.dataframe(df.sort_values("return_%",ascending=False).head(10))
