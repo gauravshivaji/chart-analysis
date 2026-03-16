@@ -83,6 +83,39 @@ if uploaded_file:
     st.subheader("📊 Investment Performance by Probability Bucket")
     st.dataframe(result_df)
 
+    # ---------------------------------------
+# Top Probability Portfolio Simulation
+# ---------------------------------------
+
+st.subheader("🚀 Top Probability Portfolio Simulation")
+
+top_n = st.slider(
+    "Select number of top probability stocks",
+    min_value=5,
+    max_value=50,
+    value=10
+)
+
+# Sort stocks by probability
+top_stocks = df.sort_values(prob_col, ascending=False).head(top_n)
+
+money_per_stock = investment / top_n
+
+top_stocks["investment"] = money_per_stock
+top_stocks["final_value"] = money_per_stock * (top_stocks[end_col] / top_stocks[start_col])
+
+portfolio_initial = top_stocks["investment"].sum()
+portfolio_final = top_stocks["final_value"].sum()
+
+portfolio_return = ((portfolio_final - portfolio_initial) / portfolio_initial) * 100
+
+st.write("### Top Probability Stocks")
+st.dataframe(top_stocks[[prob_col, start_col, end_col, "final_value"]])
+
+st.metric("Initial Investment", f"₹{portfolio_initial:,.2f}")
+st.metric("Final Portfolio Value", f"₹{portfolio_final:,.2f}")
+st.metric("Return %", f"{portfolio_return:.2f}%")
+
     # Chart 1
     fig1 = px.bar(
         result_df,
